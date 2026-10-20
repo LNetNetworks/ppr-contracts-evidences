@@ -1,0 +1,89 @@
+import "@nomicfoundation/hardhat-toolbox";
+import { subtask, task } from "hardhat/config.js";
+
+const customPaths = [
+  { sources: "./contracts_With_Gas", artifacts: "./artifacts" },
+  { sources: "./contracts_Without_Gas", artifacts: "./artifacts" },
+];
+
+export default {
+  solidity: "0.8.28",
+  paths: {
+    sources: "./contracts",
+    artifacts: "./artifacts",
+  },
+  networks: {
+    hardhat: {
+      chainId: 31337,
+      accounts: {
+        mnemonic: "test test test test test test test test test test test junk",
+        initialIndex: 0,
+        count: 20,
+        initialBalance: "10000000000000000000000"
+      },
+      certificationPath: ""
+    },
+    localhost: {
+      url: "http://127.0.0.1:8545",
+      chainId: 31337
+    },
+    testnet: {
+      url: "",                      // RPC URL of the gas-model node
+      nodeAddress: "",              // Address of the node that relays the transactions
+      expiration: 2836394529,       // Expiration timestamp used by the gas model
+      accounts: [],                 // Private keys (32 bytes, hex), e.g. ["0x...", "0x..."]
+      trustedForwarderAddress: "",  // TrustedForwarder contract address on the network
+      certificationPath: "",        // Set automatically by the custom test task
+    },
+  },
+  mocha: {
+    timeout: 300000,
+  },
+};
+
+subtask("compile-multiple", async ({ pathsFilter }, { config, run }) => {
+  const pathsToCompile = pathsFilter ?? customPaths;
+  for (const paths of pathsToCompile) {
+    console.log(`\nCompiling contracts from: ${paths.sources}`);
+    config.paths.sources = paths.sources;
+    config.paths.artifacts = paths.artifacts;
+    await run("compile:solidity", { quiet: true, force: true });
+    console.log(`Artifacts generated in: ${paths.artifacts}`);
+  }
+});
+
+task("compile", "Compiles contracts, overriding paths").setAction(
+  async (args, hre, runSuper) => {
+    if (hre.config.dontCompile) {
+      return runSuper();
+    }
+    if (customPaths.length > 0) {
+      await hre.run("compile-multiple");
+    } else {
+      await runSuper();
+    }
+  }
+);
+
+task("test", "Runs tests, overriding paths").setAction(
+  async (args, hre, runSuper) => {
+
+    let selectedPath;
+    if (hre.network.name === "hardhat" || hre.network.name === "localhost") {
+      selectedPath = customPaths.find(p => p.sources.includes("Without_Gas"));
+    } else if (hre.network.name === "testnet") {
+      selectedPath = customPaths.find(p => p.sources.includes("With_Gas"));
+    }
+
+    if (selectedPath) {
+      hre.config.paths.sources = selectedPath.sources;
+      hre.config.paths.artifacts = selectedPath.artifacts;
+      hre.network.config.certificationPath = `${selectedPath.sources.replace("./", "")}/certification.sol:Certification`;
+      await hre.run("compile-multiple", { pathsFilter: [selectedPath] });
+      hre.config.dontCompile = true;
+      await runSuper();
+    } else {
+      await runSuper(args);
+    }
+  }
+);

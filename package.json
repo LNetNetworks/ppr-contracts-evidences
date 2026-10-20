@@ -1,0 +1,14 @@
+{
+  "name": "ppr-contracts-evidences",
+  "version": "1.0.0",
+  "author": "Marisa Paredes",
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^6.1.0",
+    "hardhat": "^2.26.4"
+  },
+  "dependencies": {
+    "@lacchain/gas-model-provider": "^1.2.1",
+    "ethers": "^6.15.0"
+  }
+}
